@@ -87,15 +87,17 @@ func (d *DaemonPool) StopAll() {
 }
 
 func (d *DaemonPool) run(f func(), c chan chan struct{}) {
-	select {
-	case s := <-d.all:
-		d.all <- s
-		d.wg.Done()
-		return
-	case c := <-c:
-		d.wg.Done()
-		c <- struct{}{}
-		return
+	for {
+		select {
+		case s := <-d.all:
+			d.all <- s
+			d.wg.Done()
+			return
+		case c := <-c:
+			d.wg.Done()
+			c <- struct{}{}
+			return
+		}
+		f()
 	}
-	f()
 }
