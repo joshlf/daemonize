@@ -1,9 +1,20 @@
+// Package daemonize provides utilities for managing background daemons.
 package daemonize
 
 import (
 	"sync"
 )
 
+// A DaemonPool manages a pool of background goroutines. Each function
+// daemonized using Start or StartName will be called repeatedly. Stop
+// and StopAll will block until the relevant functions have returned,
+// so daemonized functions should not run indefinitely, but should return
+// every so often to allow the DaemonPool to stop daemons when requested.
+// This can be accomplished with time.After, net.Conn.SetDeadline, etc.
+//
+// All methods are thread-safe, though calling Stop concurrently with
+// StopAll is dangerous, as StopAll may stop the daemon named by Stop
+// before Stop gets to it, causing Stop to panic.
 type DaemonPool struct {
 	named map[string]chan chan struct{}
 	all   chan struct{}
@@ -21,6 +32,7 @@ func (d *DaemonPool) init() {
 	}
 }
 
+// StarName daemonizes f (runs it in a background goroutine).
 func (d *DaemonPool) Start(f func()) {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
@@ -29,6 +41,8 @@ func (d *DaemonPool) Start(f func()) {
 	go d.run(f, nil)
 }
 
+// StarName daemonizes f (runs it in a background goroutine),
+// associating it with the given name.
 func (d *DaemonPool) StartName(name string, f func()) {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
@@ -42,6 +56,8 @@ func (d *DaemonPool) StartName(name string, f func()) {
 	go d.run(f, c)
 }
 
+// Stop stops the named daemon. Stop will panic
+// if the named daemon does not exist.
 func (d *DaemonPool) Stop(name string) {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
@@ -56,6 +72,7 @@ func (d *DaemonPool) Stop(name string) {
 	delete(d.named, name)
 }
 
+// StopAll stops all daemons.
 func (d *DaemonPool) StopAll() {
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
